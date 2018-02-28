@@ -5,15 +5,21 @@
 # For public requests to the GDAX exchange
 
 import requests
+import time
 
 
 class PublicClient(object):
     def __init__(self, api_url='https://api.gdax.com', timeout=30):
         self.url = api_url.rstrip('/')
         self.timeout = timeout
+        self.lastRestRequestTimestamp = 0
+        self.rateLimit = 400
+        self.enableRateLimit = True
 
     def _get(self, path, params=None):
-
+        if self.enableRateLimit:
+            self.throttle()
+        self.lastRestRequestTimestamp = self.milliseconds()
         r = requests.get(self.url + path, params=params, timeout=self.timeout)
         # r.raise_for_status()
         return r.json()
@@ -40,8 +46,8 @@ class PublicClient(object):
         if granularity is not None:
             acceptedGrans = [60, 300, 900, 3600, 21600, 86400]
             if granularity not in acceptedGrans:
-                newGranularity = min(acceptedGrans, key=lambda x:abs(x-granularity))
-                print(granularity,' is not a valid granularity level, using',newGranularity,' instead.')
+                newGranularity = min(acceptedGrans, key=lambda x: abs(x - granularity))
+                print(granularity, ' is not a valid granularity level, using', newGranularity, ' instead.')
                 granularity = newGranularity
             params['granularity'] = granularity
 
@@ -55,3 +61,13 @@ class PublicClient(object):
 
     def get_time(self):
         return self._get('/time')
+
+    def throttle(self):
+        now = float(self.milliseconds())
+        elapsed = now - self.lastRestRequestTimestamp
+        if elapsed < self.rateLimit:
+            delay = self.rateLimit - elapsed
+            time.sleep(delay / 1000.0)
+
+    def milliseconds(self):
+        return int(time.time() * 1000)

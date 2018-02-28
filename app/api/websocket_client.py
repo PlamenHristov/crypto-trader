@@ -12,17 +12,16 @@ import hashlib
 import hmac
 import json
 from threading import Thread
-
+import time
 from websocket import create_connection, WebSocketConnectionClosedException
-import functools
 from app.util.lock import RWLock
 
 
 class WebsocketClient(object):
-    def __init__(self, url="wss://ws-feed.gdax.com", product=None, message_type="subscribe",
+    def __init__(self, url="wss://ws-feed.gdax.com", products=None, message_type="subscribe",
                  should_print=True, auth=False, api_key="", api_secret="", api_passphrase="", channels=None):
         self.url = url
-        self.product = product
+        self.product_ids = products
         self.channels = channels
         self.type = message_type
         self.stop = False
@@ -48,18 +47,18 @@ class WebsocketClient(object):
         self.thread.start()
 
     def _connect(self):
-        if self.product is None:
-            self.product = ["BTC-USD"]
-        elif not isinstance(self.product, list):
-            self.product = [self.product]
+        if self.product_ids is None:
+            self.product_ids = ["BTC-USD"]
+        elif not isinstance(self.product_ids, list):
+            self.product_ids = [self.product_ids]
 
         if self.url[-1] == "/":
             self.url = self.url[:-1]
 
         if self.channels is None:
-            sub_params = {'type': 'subscribe', 'product_ids': self.product}
+            sub_params = {'type': 'subscribe', 'product_ids': self.product_ids}
         else:
-            sub_params = {'type': 'subscribe', 'product_ids': self.product, 'channels': self.channels}
+            sub_params = {'type': 'subscribe', 'product_ids': self.product_ids, 'channels': self.channels}
 
         if self.auth:
             timestamp = str(time.time())
@@ -74,11 +73,6 @@ class WebsocketClient(object):
             sub_params['timestamp'] = timestamp
 
         self.ws = create_connection(self.url)
-
-        if self.type == "heartbeat":
-            sub_params = {"type": "heartbeat", "on": True}
-        else:
-            sub_params = {"type": "heartbeat", "on": False}
         self.ws.send(json.dumps(sub_params))
 
     def _listen(self):
@@ -130,40 +124,15 @@ class WebsocketClient(object):
         self.stop = True
         print('{} - data: {}'.format(e, data))
 
-    def with_write_lock(self, func):
-        @functools.wrap(func)
-        def wrapper(*a, **k):
-            self.lock.writer_enters()
-            try:
-                return func(*a, **k)
-            finally:
-                self.lock.writer_leaves()
-
-        return wrapper
-
-    def with_read_lock(self, func):
-        @functools.wrap(func)
-        def wrapper(*a, **k):
-            self.lock.reader_enters()
-            try:
-                return func(*a, **k)
-            finally:
-                self.lock.reader_leaves()
-
-        return wrapper
-
 
 if __name__ == "__main__":
     import sys
-    import gdax
     import time
 
 
-    class MyWebsocketClient(gdax.WebsocketClient):
+    class MyWebsocketClient(WebsocketClient):
         def on_open(self):
-            self.url = "wss://ws-feed.gdax.com/"
-            self.product = ["BTC-USD", "ETH-USD"]
-            self.message_count = 0
+            self.message_count=0
             print("Let's count the messages!")
 
         def on_message(self, msg):
@@ -174,9 +143,9 @@ if __name__ == "__main__":
             print("-- Goodbye! --")
 
 
-    wsClient = MyWebsocketClient()
+    wsClient = MyWebsocketClient(products=["BTC-USD", "ETH-USD"],)
     wsClient.start()
-    print(wsClient.url, wsClient.product)
+    print(wsClient.url, wsClient.product_ids)
     try:
         while True:
             print("\nMessageCount =", "%i \n" % wsClient.message_count)
