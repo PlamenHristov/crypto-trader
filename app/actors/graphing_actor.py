@@ -1,4 +1,3 @@
-from app.actors.actor import Actor
 import datetime as dt
 from pykka import ThreadingActor
 
