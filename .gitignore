@@ -109,4 +109,4 @@ ENV/
 .ropeproject
 
 market-data/
-
+.idea/

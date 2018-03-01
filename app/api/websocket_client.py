@@ -44,6 +44,7 @@ class WebsocketClient(object):
         self.stop = False
         self.on_open()
         self.thread = Thread(target=_go)
+        self.thread.daemon = True
         self.thread.start()
 
     def _connect(self):
@@ -132,7 +133,7 @@ if __name__ == "__main__":
 
     class MyWebsocketClient(WebsocketClient):
         def on_open(self):
-            self.message_count=0
+            self.message_count = 0
             print("Let's count the messages!")
 
         def on_message(self, msg):
@@ -143,7 +144,7 @@ if __name__ == "__main__":
             print("-- Goodbye! --")
 
 
-    wsClient = MyWebsocketClient(products=["BTC-USD", "ETH-USD"],)
+    wsClient = MyWebsocketClient(products=["BTC-USD", "ETH-USD"], )
     wsClient.start()
     print(wsClient.url, wsClient.product_ids)
     try:

@@ -5,17 +5,16 @@ from bintrees import RBTree
 
 from app.api.public_client import PublicClient
 from app.api.websocket_client import WebsocketClient
-from app.util.lock import RWLock
+import copy
 
 
 class GDaxOrderBook(WebsocketClient):
-    def __init__(self, products=list('BTC-USD'), subscribers=list()):
+    def __init__(self, products=list('BTC-USD'), actors=list()):
         super(GDaxOrderBook, self).__init__(products=products)
         self.books = {
             prod: {
                 "_asks": RBTree(),
                 "_bids": RBTree(),
-                "lock": RWLock(),
                 "sequence": 0,
             }
             for prod in products
@@ -24,7 +23,7 @@ class GDaxOrderBook(WebsocketClient):
         self._first_run = True
         self._current_ticker = None
         self._resetting_book = False
-        self.subscribers = subscribers
+        self.actors = actors
 
     def _connect(self):
         super()._connect()
@@ -42,23 +41,22 @@ class GDaxOrderBook(WebsocketClient):
 
     def reset_product(self, product_id):
         res = self._client.get_product_order_book(product_id=product_id, level=3)
-        with self.books[product_id]['lock'].writer():
-            self._reset_bid_ask(product_id)
-            for bid in res['bids']:
-                self.add(product_id, {
-                    'id': bid[2],
-                    'side': 'buy',
-                    'price': Decimal(bid[0]),
-                    'size': Decimal(bid[1])
-                })
-            for ask in res['asks']:
-                self.add(product_id, {
-                    'id': ask[2],
-                    'side': 'sell',
-                    'price': Decimal(ask[0]),
-                    'size': Decimal(ask[1])
-                })
-            self.books[product_id]['sequence'] = res['sequence']
+        self._reset_bid_ask(product_id)
+        for bid in res['bids']:
+            self.add(product_id, {
+                'id': bid[2],
+                'side': 'buy',
+                'price': Decimal(bid[0]),
+                'size': Decimal(bid[1])
+            })
+        for ask in res['asks']:
+            self.add(product_id, {
+                'id': ask[2],
+                'side': 'sell',
+                'price': Decimal(ask[0]),
+                'size': Decimal(ask[1])
+            })
+        self.books[product_id]['sequence'] = res['sequence']
 
     def reset_book(self):
         print("Resetting book")
@@ -72,15 +70,13 @@ class GDaxOrderBook(WebsocketClient):
 
         sequence = message['sequence']
         product_id = message['product_id']
-        with self.books[product_id]["lock"].reader():
-            product_sequence = self.books[product_id]['sequence']
+        product_sequence = self.books[product_id]['sequence']
 
         if sequence <= product_sequence:
             print('Older message: {}\nSequence:{}'.format(message, self.books[product_id]['sequence']))
             # ignore older messages (e.g. before order book initialization from getProductOrderBook)
             return
         elif sequence > product_sequence + 1:
-            print(message)
             self.on_sequence_gap(product_sequence, sequence)
             return
 
@@ -95,16 +91,13 @@ class GDaxOrderBook(WebsocketClient):
         elif msg_type == 'change':
             self.change(product_id, message)
 
-        with self.books[product_id]["lock"].writer():
-            self.books[product_id]['sequence'] = sequence
+        self.books[product_id]['sequence'] = sequence
 
         self.send_book_to_subscribers()
 
-    #
     def send_book_to_subscribers(self):
-        full_book = self.get_full_book()
-        for sub in self.subscribers:
-            sub.send({'formatter': GDaxOrderBook.to_pandas_table, 'full_book': full_book})
+        for actor_ref in self.actors:
+            actor_ref.tell({'formatter': GDaxOrderBook.to_pandas_table, 'full_book': self.books})
 
     def on_sequence_gap(self, gap_start, gap_end):
         print('Error: messages missing ({} - {}). Re-initializing  book at sequence.'
@@ -213,36 +206,34 @@ class GDaxOrderBook(WebsocketClient):
         return self._current_ticker
 
     def get_product_book(self, product_id):
-        current_book = self.books[product_id]
-        with current_book["lock"].reader():
-            result = {
-                'sequence': self.books[product_id]['sequence'],
-                'asks': [],
-                'bids': [],
-            }
-            for ask in self.books[product_id]['_asks']:
-                try:
-                    # There can be a race condition here, where a price point is removed
-                    # between these two ops
-                    this_ask = self.books[product_id]['_asks'][ask]
-                except KeyError:
-                    continue
-                for order in this_ask:
-                    result['asks'].append([order['side'], order['price'], order['size'], order['id']])
-            for bid in self.books[product_id]['_bids']:
-                try:
-                    # There can be a race condition here, where a price point is removed
-                    # between these two ops
-                    this_bid = self.books[product_id]['_bids'][bid]
-                except KeyError:
-                    continue
+        result = {
+            'sequence': self.books[product_id]['sequence'],
+            'asks': [],
+            'bids': [],
+        }
+        for ask in self.books[product_id]['_asks']:
+            try:
+                # There can be a race condition here, where a price point is removed
+                # between these two ops
+                this_ask = self.books[product_id]['_asks'][ask]
+            except KeyError:
+                continue
+            for order in this_ask:
+                result['asks'].append([order['side'], order['price'], order['size'], order['id']])
+        for bid in self.books[product_id]['_bids']:
+            try:
+                # There can be a race condition here, where a price point is removed
+                # between these two ops
+                this_bid = self.books[product_id]['_bids'][bid]
+            except KeyError:
+                continue
 
-                for order in this_bid:
-                    result['bids'].append([order['side'], order['price'], order['size'], order['id']])
-            return result
+            for order in this_bid:
+                result['bids'].append([order['side'], order['price'], order['size'], order['id']])
+        return result
 
-    def get_full_book(self):
-        return {prod: self.get_product_book(prod) for prod in self.product_ids}
+    # def get_full_book(self):
+    #     return {prod: self.get_product_book(prod) for prod in self.product_ids}
 
     def get_ask(self, product_id):
         return self.books[product_id]['_asks'].min_key()
@@ -295,7 +286,7 @@ if __name__ == '__main__':
         ''' Logs real-time changes to the bid-ask spread to the console '''
 
         def __init__(self, product_id=None):
-            super(OrderBookConsole, self).__init__(products=["BTC-USD", "LTC-USD", ])
+            super(OrderBookConsole, self).__init__(products=["BTC-USD", "ETH-USD"])
 
             # latest values of bid-ask spread
             self._bid = None

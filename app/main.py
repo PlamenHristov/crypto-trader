@@ -4,13 +4,18 @@ import argparse
 import sys
 
 from app.clients.mysql import MysqlClient
-from app.exchanges.gateway import ExchangeGateway
-from app.exchanges.gdax import ExchGwGdax
 from app.subscription_manager import SubscriptionManager
 from app.util.logger import Logger
+from app.exchanges.gdax_order_book import GDaxOrderBook
+from app.actors.graphing_actor import GraphingActor
+from collections import defaultdict
+import time
 
 
 def main():
+    suported_books = {
+        'gdax': GDaxOrderBook
+    }
     parser = argparse.ArgumentParser(description='Crypto exchange data handler.')
     parser.add_argument('-instmts', action='store', help='Instrument subscription file.', default='subscriptions.ini')
     parser.add_argument('-mysql', action='store_true', help='Use MySQL.')
@@ -68,14 +73,32 @@ def main():
         log_str += '%s/%s/%s\n' % (instmt.exchange_name, instmt.instmt_name, instmt.instmt_code)
     Logger.info('[main]', log_str)
 
-    exch_gws = [ExchGwGdax(db_clients)]
-    threads = []
-    for exch in exch_gws:
-        for instmt in subscription_instmts:
-            if instmt.get_exchange_name() == exch.get_exchange_name():
-                Logger.info("[main]", "Starting instrument %s-%s..." % \
-                            (instmt.get_exchange_name(), instmt.get_instmt_name()))
-                threads += exch.start(instmt)
+    actors = [GraphingActor()]
+    actor_refs = []
+    for actor in actors:
+        actor_refs.append(actor.start())
+
+    subs = defaultdict(list)
+    for instmt in subscription_instmts:
+        Logger.info("[main]", "Starting instrument %s-%s..." % \
+                    (instmt.get_exchange_name(), instmt.get_instmt_name()))
+        subs[instmt.get_exchange_name().lower()].append(instmt.get_instmt_code())
+
+    started_exchanges = []
+    for exchange, products in subs.items():
+        book = suported_books[exchange]
+        if book:
+            started_exchanges.append(book(actors=actor_refs,
+                                          products=products).start())
+
+    try:
+        while True:
+            time.sleep(10)
+    except KeyboardInterrupt:
+        for actor in actor_refs:
+            actor.stop()
+        for exch in started_exchanges:
+            exch.close()
 
 
 if __name__ == '__main__':

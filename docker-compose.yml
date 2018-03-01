@@ -16,10 +16,3 @@ services:
        - MYSQL_PASSWORD=mypass
     volumes:
       - ./market-data:/var/lib/mysql
-
-  adminer:
-    container_name: adminer_crypto
-    image: adminer
-    restart: always
-    ports:
-      - 8080:8080

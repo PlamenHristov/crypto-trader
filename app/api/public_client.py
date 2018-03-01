@@ -13,7 +13,7 @@ class PublicClient(object):
         self.url = api_url.rstrip('/')
         self.timeout = timeout
         self.lastRestRequestTimestamp = 0
-        self.rateLimit = 400
+        self.rateLimit = 300
         self.enableRateLimit = True
 
     def _get(self, path, params=None):
