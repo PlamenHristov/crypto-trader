@@ -5,7 +5,7 @@ from bintrees import RBTree
 
 from app.api.public_client import PublicClient
 from app.api.websocket_client import WebsocketClient
-import copy
+from app.util.logger import Logger
 
 
 class GDaxOrderBook(WebsocketClient):
@@ -30,10 +30,10 @@ class GDaxOrderBook(WebsocketClient):
 
     def on_open(self):
         self._first_run = True
-        print("-- Subscribed to OrderBook! --\n")
+        Logger.info('gdax_order_book', "-- Subscribed to OrderBook! --\n")
 
     def on_close(self):
-        print("\n-- OrderBook Socket Closed! --")
+        Logger.info('gdax_order_book', "\n-- OrderBook Socket Closed! --")
 
     def _reset_bid_ask(self, product_id):
         self.books[product_id]["_asks"] = RBTree()
@@ -59,7 +59,7 @@ class GDaxOrderBook(WebsocketClient):
         self.books[product_id]['sequence'] = res['sequence']
 
     def reset_book(self):
-        print("Resetting book")
+        Logger.info('gdax_order_book', "Resetting book")
         for prod in self.product_ids:
             self.reset_product(prod)
 
@@ -73,7 +73,7 @@ class GDaxOrderBook(WebsocketClient):
         product_sequence = self.books[product_id]['sequence']
 
         if sequence <= product_sequence:
-            print('Older message: {}\nSequence:{}'.format(message, self.books[product_id]['sequence']))
+            Logger.info('gdax_order_book', 'Older message: {}\nSequence:{}'.format(message, self.books[product_id]['sequence']))
             # ignore older messages (e.g. before order book initialization from getProductOrderBook)
             return
         elif sequence > product_sequence + 1:
@@ -91,16 +91,17 @@ class GDaxOrderBook(WebsocketClient):
         elif msg_type == 'change':
             self.change(product_id, message)
 
+        Logger.info('gdax_order_book',"Product: {}, Message: {}, book:{}" .format(product_id,sequence, self.books[product_id]['sequence']))
         self.books[product_id]['sequence'] = sequence
-
         self.send_book_to_subscribers()
 
     def send_book_to_subscribers(self):
         for actor_ref in self.actors:
-            actor_ref.tell({'formatter': GDaxOrderBook.to_pandas_table, 'full_book': self.books})
+            actor_ref.tell({'formatter': GDaxOrderBook.to_pandas_table,
+                            'full_book':  self.books})
 
     def on_sequence_gap(self, gap_start, gap_end):
-        print('Error: messages missing ({} - {}). Re-initializing  book at sequence.'
+        Logger.info('gdax_order_book', 'Error: messages missing ({} - {}). Re-initializing  book at sequence.'
               .format(gap_start, gap_end))
         self.reset_book()
 
@@ -205,36 +206,6 @@ class GDaxOrderBook(WebsocketClient):
     def get_current_ticker(self):
         return self._current_ticker
 
-    def get_product_book(self, product_id):
-        result = {
-            'sequence': self.books[product_id]['sequence'],
-            'asks': [],
-            'bids': [],
-        }
-        for ask in self.books[product_id]['_asks']:
-            try:
-                # There can be a race condition here, where a price point is removed
-                # between these two ops
-                this_ask = self.books[product_id]['_asks'][ask]
-            except KeyError:
-                continue
-            for order in this_ask:
-                result['asks'].append([order['side'], order['price'], order['size'], order['id']])
-        for bid in self.books[product_id]['_bids']:
-            try:
-                # There can be a race condition here, where a price point is removed
-                # between these two ops
-                this_bid = self.books[product_id]['_bids'][bid]
-            except KeyError:
-                continue
-
-            for order in this_bid:
-                result['bids'].append([order['side'], order['price'], order['size'], order['id']])
-        return result
-
-    # def get_full_book(self):
-    #     return {prod: self.get_product_book(prod) for prod in self.product_ids}
-
     def get_ask(self, product_id):
         return self.books[product_id]['_asks'].min_key()
 
@@ -260,20 +231,61 @@ class GDaxOrderBook(WebsocketClient):
         self.books[product_id]['_bids'].insert(price, bids)
 
     @staticmethod
+    def get_product_book(book, product_id):
+        result = {
+            'sequence': book[product_id]['sequence'],
+            'asks': [],
+            'bids': [],
+        }
+        for ask in book[product_id]['_asks']:
+            try:
+                # There can be a race condition here, where a price point is removed
+                # between these two ops
+                this_ask = book[product_id]['_asks'][ask]
+            except KeyError:
+                continue
+            for order in this_ask:
+                result['asks'].append([order['side'], order['price'], order['size'], order['id']])
+        for bid in book[product_id]['_bids']:
+            try:
+                # There can be a race condition here, where a price point is removed
+                # between these two ops
+                this_bid = book[product_id]['_bids'][bid]
+            except KeyError:
+                continue
+
+            for order in this_bid:
+                result['bids'].append([order['side'], order['price'], order['size'], order['id']])
+        return result
+
+    @staticmethod
+    def get_full_book(book):
+        res = {}
+        for prod in book:
+            res.update({prod: GDaxOrderBook.get_product_book(book, prod)})
+        return res
+
+    @staticmethod
     def to_pandas_table(current_book):
-        ask_tbl = pd.DataFrame(
-            data=current_book['asks'],
-            columns=['side', 'price', 'volume', 'order_id'],
-            index=range(len(current_book['asks']))
-        )
-        bid_tbl = pd.DataFrame(
-            data=current_book['bids'],
-            columns=['side', 'price', 'volume', 'order_id'],
-            index=range(len(current_book['asks']))
-        )
-        con_tbl = pd.concat([ask_tbl, bid_tbl, ], axis=0).reset_index(drop=True)
-        con_tbl['id'] = con_tbl.index
-        return con_tbl
+        res_table = pd.DataFrame()
+
+        for prod in current_book:
+            bid_ask_data = current_book[prod]
+            ask_tbl = pd.DataFrame(
+                data=bid_ask_data['asks'],
+                columns=['side', 'price', 'volume', 'order_id'],
+                index=range(len(bid_ask_data['asks']))
+            )
+            bid_tbl = pd.DataFrame(
+                data=bid_ask_data['bids'],
+                columns=['side', 'price', 'volume', 'order_id'],
+                index=range(len(bid_ask_data['bids']))
+            )
+            con_tbl = pd.concat([ask_tbl, bid_tbl, ], axis=0).reset_index(drop=True)
+            con_tbl['ticker'] = prod
+            res_table = pd.concat([con_tbl, res_table, ], axis=0).reset_index(drop=True)
+        res_table['id'] = res_table.index
+        return res_table
 
 
 if __name__ == '__main__':
@@ -314,7 +326,7 @@ if __name__ == '__main__':
                     self._ask = ask
                     self._bid_depth = bid_depth
                     self._ask_depth = ask_depth
-                    print('{} {} bid: {:.3f} @ {:.2f}\task: {:.3f} @ {:.2f}'.format(
+                    Logger.info('gdax_order_book', '{} {} bid: {:.3f} @ {:.2f}\task: {:.3f} @ {:.2f}'.format(
                         dt.datetime.now(), product_id, bid_depth, bid, ask_depth, ask))
 
 

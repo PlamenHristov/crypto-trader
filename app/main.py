@@ -80,16 +80,19 @@ def main():
 
     subs = defaultdict(list)
     for instmt in subscription_instmts:
-        Logger.info("[main]", "Starting instrument %s-%s..." % \
-                    (instmt.get_exchange_name(), instmt.get_instmt_name()))
+        Logger.info("[main]",
+                    "Starting instrument {}-{}...".format(instmt.get_exchange_name(), instmt.get_instmt_name()))
         subs[instmt.get_exchange_name().lower()].append(instmt.get_instmt_code())
 
     started_exchanges = []
     for exchange, products in subs.items():
         book = suported_books[exchange]
         if book:
-            started_exchanges.append(book(actors=actor_refs,
-                                          products=products).start())
+            book_to_start = book(
+                actors=actor_refs,
+                products=products)
+            book_to_start.start()
+            started_exchanges.append(book_to_start)
 
     try:
         while True:
