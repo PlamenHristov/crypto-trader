@@ -1,16 +1,9 @@
 from __future__ import print_function
 
-import logging
-
-from app.exchanges.book import OrderBook
-from bittrex_websocket.websocket_client import BittrexSocket
 import pandas as pd
+from bittrex_websocket.websocket_client import BittrexSocket
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger_handler = logging.StreamHandler()  # Handler for the logger
-logger.addHandler(logger_handler)
+from exchanges.book import OrderBook
 
 
 class BittrexOrderBook(BittrexSocket, OrderBook):

@@ -6,7 +6,7 @@ class Logger:
 
     @staticmethod
     def init_log(output=None):
-        Logger.logger = logging.getLogger('BitcoinExchangeFH')
+        Logger.logger = logging.getLogger('crypto-trader')
         Logger.logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s \n%(message)s\n')
         if output is None:
@@ -19,9 +19,9 @@ class Logger:
             Logger.logger.addHandler(flogger)
 
     @staticmethod
-    def info(method, str):
-        Logger.logger.info('[%s]\n%s\n' % (method, str))
+    def info(str):
+        Logger.logger.info(str)
 
     @staticmethod
-    def error(method, str):
-        Logger.logger.error('[%s]\n%s\n' % (method, str))
+    def error(str):
+        Logger.logger.info(str)

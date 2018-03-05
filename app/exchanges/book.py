@@ -1,16 +1,10 @@
-import logging
+from util.logger import Logger
 from decimal import Decimal
 from functools import partial
 import time
 import pandas as pd
 
 from bintrees import RBTree
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger_handler = logging.StreamHandler()  # Handler for the logger
-logger.addHandler(logger_handler)
 
 
 class OrderBook(object):
@@ -43,38 +37,34 @@ class OrderBook(object):
     def reset_product(self, product_id):
         res = self._format_book_response(self._get_order_book_for_product(product_id=product_id))
         self._reset_bid_ask(product_id)
-        try:
-            for bid in res['bids']:
-                self.add(product_id, {
-                    'id': bid[2],
-                    'side': 'buy',
-                    'price': Decimal(bid[0]),
-                    'size': Decimal(bid[1])
-                })
-            for ask in res['asks']:
-                self.add(product_id, {
-                    'id': ask[2],
-                    'side': 'sell',
-                    'price': Decimal(ask[0]),
-                    'size': Decimal(ask[1])
-                })
-            self.books[product_id]['sequence'] = res['sequence']
-        except KeyError:
-            print('WTF?!')
+        for bid in res['bids']:
+            self.add(product_id, {
+                'id': bid[2],
+                'side': 'buy',
+                'price': Decimal(bid[0]),
+                'size': Decimal(bid[1])
+            })
+        for ask in res['asks']:
+            self.add(product_id, {
+                'id': ask[2],
+                'side': 'sell',
+                'price': Decimal(ask[0]),
+                'size': Decimal(ask[1])
+            })
+        self.books[product_id]['sequence'] = res['sequence']
 
     def reset_book(self):
         for prod in self.product_ids:
             self.reset_product(prod)
 
     def send_book_to_subscribers(self):
-        print(self.exchange_name)
         for actor_ref in self.actors:
             actor_ref.tell({'formatter': self.to_pandas_table,
                             'full_book': partial(self.get_full_book, self.books),
                             'exchange': self.exchange_name})
 
     def on_sequence_gap(self, gap_start, gap_end):
-        logger.info('Error: messages missing ({} - {}). Re-initializing  book at sequence.'
+        Logger.info('Error: messages missing ({} - {}). Re-initializing  book at sequence.'
                     .format(gap_start, gap_end))
         self.reset_book()
 

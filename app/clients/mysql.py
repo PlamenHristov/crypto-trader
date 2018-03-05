@@ -1,7 +1,7 @@
-from app.clients.sql import SqlClient
+from clients.sql import SqlClient
 import pymysql
 import pandas as pd
-from app.util.logger import Logger
+from util.logger import Logger
 
 
 class MysqlClient(SqlClient):

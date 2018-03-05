@@ -2,56 +2,24 @@
 
 import argparse
 import sys
-
-from app.clients.mysql import MysqlClient
-from app.subscription_manager import SubscriptionManager
-from app.util.logger import Logger
-from app.exchanges.gdax_orderbook import GDaxOrderBook
-from app.exchanges.bitfinex import BitfinexOrderBook
-from app.exchanges.bittrex_orderbook import BittrexOrderBook
-
-from app.actors.graphing_actor import GraphingActor
-from collections import defaultdict
 import time
+from collections import defaultdict
+
+from actors.graphing_actor import GraphingActor
+from exchanges.bittrex_orderbook import BittrexOrderBook
+from exchanges.gdax_orderbook import GDaxOrderBook
+from subscription_manager import SubscriptionManager
+from util.logger import Logger
 
 
 def main():
     parser = argparse.ArgumentParser(description='Crypto exchange data handler.')
     parser.add_argument('-instmts', action='store', help='Instrument subscription file.', default='subscriptions.ini')
-    parser.add_argument('-mysql', action='store_true', help='Use MySQL.')
-    parser.add_argument('-mysqldest', action='store', dest='mysqldest',
-                        help='MySQL destination. Formatted as <name:pwd@host:port>',
-                        default='')
-    parser.add_argument('-mysqlschema', action='store', dest='mysqlschema',
-                        help='MySQL schema.',
-                        default='')
     parser.add_argument('-output', action='store', dest='output',
                         help='Verbose output file path')
     args = parser.parse_args()
 
     Logger.init_log(args.output)
-
-    db_clients = []
-    is_database_defined = False
-    if args.mysql:
-        db_client = MysqlClient()
-        mysqldest = args.mysqldest
-        user = mysqldest.split('@')[0].split(':')[0]
-        pwd = mysqldest.split('@')[0].split(':')[1]
-        host = mysqldest.split('@')[1].split(':')[0]
-        port = int(mysqldest.split('@')[1].split(':')[1])
-        db_client.connect(host=host,
-                          port=port,
-                          user=user,
-                          pwd=pwd,
-                          schema=args.mysqlschema)
-        db_clients.append(db_client)
-        is_database_defined = True
-
-    if not is_database_defined:
-        print('Error: Please define which database is used.')
-        parser.print_help()
-        sys.exit(1)
 
     # Subscription instruments
     if args.instmts is None or len(args.instmts) == 0:

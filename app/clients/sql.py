@@ -1,5 +1,5 @@
-from app.clients.database import DatabaseClient
-from app.util.logger import Logger
+from clients.database import DatabaseClient
+from util.logger import Logger
 import threading
 
 

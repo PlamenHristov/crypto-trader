@@ -13,8 +13,10 @@ import hmac
 import json
 from threading import Thread
 import time
+
 from websocket import create_connection, WebSocketConnectionClosedException
-from app.util.lock import RWLock
+
+from util.lock import RWLock
 
 
 class WebsocketClient(object):

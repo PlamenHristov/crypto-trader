@@ -1,23 +1,10 @@
-import logging
-import sys
-import zlib
-from collections import Iterable
 from decimal import Decimal
-from functools import partial
-from pprint import pprint as pp
 from threading import Thread
+
 import pandas as pd
 
 from app.api.bitfinex_api import BitfinexREST
 from app.exchanges.book import OrderBook
-
-# url = "wss://ws-feed.gdax.com", products = None, message_type = "subscribe",
-# should_print = True, auth = False, api_key = "", api_secret = "", api_passphrase = "", channels = None
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger_handler = logging.StreamHandler(sys.stdout)  # Handler for the logger
-logger.addHandler(logger_handler)
 
 
 # Example update message structure [1765.2, 0, 1] where we have [price, count, amount].

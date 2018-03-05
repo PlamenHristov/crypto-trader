@@ -1,9 +1,10 @@
-from app.clients.database import DatabaseClient
-from app.util.logger import Logger
 import threading
-import re
-import zmq
 import time
+
+import zmq
+
+from clients.database import DatabaseClient
+from util.logger import Logger
 
 
 class ZmqClient(DatabaseClient):

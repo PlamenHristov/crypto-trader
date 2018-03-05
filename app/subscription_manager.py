@@ -1,4 +1,4 @@
-from app.models.instrument import Instrument
+from models.instrument import Instrument
 
 try:
     import ConfigParser

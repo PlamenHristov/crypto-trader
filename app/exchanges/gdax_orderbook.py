@@ -2,15 +2,11 @@ import logging
 
 import pandas as pd
 
-from app.api.websocket_client import WebsocketClient
-from app.exchanges.book import OrderBook
-from app.api.public_client import PublicClient
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger_handler = logging.StreamHandler()  # Handler for the logger
-logger.addHandler(logger_handler)
+from api.websocket_client import WebsocketClient
+from exchanges.book import OrderBook
+from api.public_client import PublicClient
+from util.logger import Logger
+import time
 
 
 class GDaxOrderBook(WebsocketClient, OrderBook):
@@ -25,10 +21,10 @@ class GDaxOrderBook(WebsocketClient, OrderBook):
 
     def on_open(self):
         self._first_run = True
-        logger.info("-- Subscribed to OrderBook! --\n")
+        Logger.info("-- Subscribed to OrderBook! --\n")
 
     def on_close(self):
-        logger.info("\n-- OrderBook Socket Closed! --")
+        Logger.info("\n-- OrderBook Socket Closed! --")
 
     def on_message(self, message):
         if self._first_run:
@@ -40,7 +36,7 @@ class GDaxOrderBook(WebsocketClient, OrderBook):
         product_sequence = self.books[product_id]['sequence']
 
         if sequence <= product_sequence:
-            logger.info('Older message: {}\nSequence:{}'.format(message, self.books[product_id]['sequence']))
+            Logger.info('Older message: {}\nSequence:{}'.format(message, self.books[product_id]['sequence']))
             # ignore older messages (e.g. before order book initialization from getProductOrderBook)
             return
         elif sequence > product_sequence + 1:
@@ -90,7 +86,6 @@ if __name__ == '__main__':
     import sys
     import time
     import datetime as dt
-    from app.api.public_client import PublicClient
 
 
     class OrderBookConsole(GDaxOrderBook):

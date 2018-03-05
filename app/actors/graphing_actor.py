@@ -8,7 +8,7 @@ PRICE_RANGE = 0.3
 class GraphingActor(ThreadingActor):
     subplots = None
     graphs = {}
-    figure = None
+
     def __int__(self, *args, **kwargs):
         super(GraphingActor, self).__init__()
         self.init_graph()
@@ -20,7 +20,7 @@ class GraphingActor(ThreadingActor):
     @staticmethod
     def init_subplots(products):
         if GraphingActor.subplots is None:
-            GraphingActor.figure, GraphingActor.subplots = plt.subplots(len(products), 1, squeeze=False)
+            figure, GraphingActor.subplots = plt.subplots(len(products), 1, squeeze=False)
             for ax in GraphingActor.subplots.flat:
                 ax.set(xlabel='Price', ylabel='Volume')
 
