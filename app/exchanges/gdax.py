@@ -1,13 +1,13 @@
+import datetime
 import threading
 from functools import partial
 
 import numpy as np
 import pandas as pd
 
-from app.exchanges.gateway import ExchangeCoordinator
 from app.models.market_data import Snapshot
 from app.util.logger import Logger
-import datetime
+from retired.gateway import ExchangeCoordinator
 
 TBL_PRICE = 'price'
 TBL_VOLUME = 'volume'

@@ -35,22 +35,21 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    Logger.info('[main]', 'Subscription file = %s' % args.instmts)
+    Logger.info('Subscription file = %s' % args.instmts)
     log_str = 'Exchange/Instrument/InstrumentCode:\n'
     for instmt in subscription_instmts:
         log_str += '%s/%s/%s\n' % (instmt.exchange_name, instmt.instmt_name, instmt.instmt_code)
-    Logger.info('[main]', log_str)
+    Logger.info(log_str)
 
     actors = [GraphingActor]
-    suported_books = [GDaxOrderBook,BittrexOrderBook]
+    suported_books = [GDaxOrderBook, BittrexOrderBook]
     actor_refs = []
     for actor in actors:
         actor_refs.append(actor.start())
 
     subs = defaultdict(list)
     for instmt in subscription_instmts:
-        Logger.info("[main]",
-                    "Starting instrument {}-{}...".format(instmt.get_exchange_name(), instmt.get_instmt_name()))
+        Logger.info("Starting instrument {}-{}...".format(instmt.get_exchange_name(), instmt.get_instmt_name()))
         subs[instmt.get_exchange_name().lower()].append(instmt.get_instmt_code())
 
     started_exchanges = []
