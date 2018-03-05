@@ -6,16 +6,16 @@ import sys
 from app.clients.mysql import MysqlClient
 from app.subscription_manager import SubscriptionManager
 from app.util.logger import Logger
-from app.exchanges.gdax_order_book import GDaxOrderBook
+from app.exchanges.gdax_orderbook import GDaxOrderBook
+from app.exchanges.bitfinex import BitfinexOrderBook
+from app.exchanges.bittrex_orderbook import BittrexOrderBook
+
 from app.actors.graphing_actor import GraphingActor
 from collections import defaultdict
 import time
 
 
 def main():
-    suported_books = {
-        'gdax': GDaxOrderBook
-    }
     parser = argparse.ArgumentParser(description='Crypto exchange data handler.')
     parser.add_argument('-instmts', action='store', help='Instrument subscription file.', default='subscriptions.ini')
     parser.add_argument('-mysql', action='store_true', help='Use MySQL.')
@@ -73,7 +73,8 @@ def main():
         log_str += '%s/%s/%s\n' % (instmt.exchange_name, instmt.instmt_name, instmt.instmt_code)
     Logger.info('[main]', log_str)
 
-    actors = [GraphingActor()]
+    actors = [GraphingActor]
+    suported_books = [GDaxOrderBook,BittrexOrderBook]
     actor_refs = []
     for actor in actors:
         actor_refs.append(actor.start())
@@ -85,14 +86,15 @@ def main():
         subs[instmt.get_exchange_name().lower()].append(instmt.get_instmt_code())
 
     started_exchanges = []
-    for exchange, products in subs.items():
-        book = suported_books[exchange]
-        if book:
-            book_to_start = book(
-                actors=actor_refs,
-                products=products)
-            book_to_start.start()
-            started_exchanges.append(book_to_start)
+    for book in suported_books:
+        for exchange, products in subs.items():
+            if book.exchange_name.lower() == exchange.lower():
+                book_to_start = book(
+                    actors=actor_refs,
+                    products=products
+                )
+                book_to_start.start()
+                started_exchanges.append(book_to_start)
 
     try:
         while True:

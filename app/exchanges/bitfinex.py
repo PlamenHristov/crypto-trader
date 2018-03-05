@@ -105,21 +105,8 @@ class BitfinexOrderBook(OrderBook):
                     'price': Decimal(ask['price']),
                     'size': Decimal(ask['amount'])
                 })
-            self.books[product_id]['sequence'] = res['sequence']
         except KeyError:
             print('WTF?!')
-
-    def get_product_book(self, book, product_id):
-        result = {
-            'asks': [],
-            'bids': [],
-        }
-        for internal, external in zip(['_bids', '_asks'], ['bids', 'asks']):
-            for price_key, order in self.books[product_id][internal].items():
-                result[external].append(
-                    [order['side'], order['price'], order['size'], order.get('id', None) or order.get('count', None)])
-
-        return result
 
     def to_pandas_table(self, current_book):
         res_table = pd.DataFrame()

@@ -43,28 +43,31 @@ class OrderBook(object):
     def reset_product(self, product_id):
         res = self._format_book_response(self._get_order_book_for_product(product_id=product_id))
         self._reset_bid_ask(product_id)
-        for bid in res['bids']:
-            self.add(product_id, {
-                'id': bid[2],
-                'side': 'buy',
-                'price': Decimal(bid[0]),
-                'size': Decimal(bid[1])
-            })
-        for ask in res['asks']:
-            self.add(product_id, {
-                'id': ask[2],
-                'side': 'sell',
-                'price': Decimal(ask[0]),
-                'size': Decimal(ask[1])
-            })
-        self.books[product_id]['sequence'] = res['sequence']
+        try:
+            for bid in res['bids']:
+                self.add(product_id, {
+                    'id': bid[2],
+                    'side': 'buy',
+                    'price': Decimal(bid[0]),
+                    'size': Decimal(bid[1])
+                })
+            for ask in res['asks']:
+                self.add(product_id, {
+                    'id': ask[2],
+                    'side': 'sell',
+                    'price': Decimal(ask[0]),
+                    'size': Decimal(ask[1])
+                })
+            self.books[product_id]['sequence'] = res['sequence']
+        except KeyError:
+            print('WTF?!')
 
     def reset_book(self):
-        logger.info("Resetting book")
         for prod in self.product_ids:
             self.reset_product(prod)
 
     def send_book_to_subscribers(self):
+        print(self.exchange_name)
         for actor_ref in self.actors:
             actor_ref.tell({'formatter': self.to_pandas_table,
                             'full_book': partial(self.get_full_book, self.books),
@@ -214,7 +217,8 @@ class OrderBook(object):
             except KeyError:
                 continue
             for order in this_ask:
-                result['asks'].append([order['side'], order['price'], order['size'], order['id']])
+                result['asks'].append(
+                    [order['side'], order['price'], order['size'], order.get('id', None) or order.get('count', None)])
         for bid in book[product_id]['_bids']:
             try:
                 # There can be a race condition here, where a price point is removed
@@ -224,7 +228,7 @@ class OrderBook(object):
                 continue
 
             for order in this_bid:
-                result['bids'].append([order['side'], order['price'], order['size'], order['id']])
+                result['bids'].append([order['side'], order['price'], order['size'], order['id'] or order['count']])
         return result
 
     def get_full_book(self, book):

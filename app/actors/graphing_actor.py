@@ -1,6 +1,3 @@
-from collections import defaultdict
-
-import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib import style
 from pykka import ThreadingActor
@@ -11,7 +8,7 @@ PRICE_RANGE = 0.3
 class GraphingActor(ThreadingActor):
     subplots = None
     graphs = {}
-
+    figure = None
     def __int__(self, *args, **kwargs):
         super(GraphingActor, self).__init__()
         self.init_graph()
@@ -23,13 +20,13 @@ class GraphingActor(ThreadingActor):
     @staticmethod
     def init_subplots(products):
         if GraphingActor.subplots is None:
-            figs, GraphingActor.subplots = plt.subplots(len(products), 1, squeeze=False)
+            GraphingActor.figure, GraphingActor.subplots = plt.subplots(len(products), 1, squeeze=False)
             for ax in GraphingActor.subplots.flat:
                 ax.set(xlabel='Price', ylabel='Volume')
 
     def on_receive(self, message):
-        full_book = self.get_full_book(message['full_book'])
-        full_book_tbl = message['formatter'](full_book)
+        exchange_name = message['exchange']
+        full_book_tbl = message['formatter'](message['full_book']())
         price_vol_side_ticker = full_book_tbl[['price', 'volume', 'side', 'ticker']]
         products = price_vol_side_ticker.ticker.unique()
 
@@ -58,7 +55,7 @@ class GraphingActor(ThreadingActor):
             bid_tbl['volume_cumul'], ask_tbl['volume_cumul'] = bid_tbl['volume'].cumsum(), ask_tbl['volume'].cumsum()
 
             if not GraphingActor.graphs.get((prod, i, 0), None):
-                GraphingActor.subplots[i, 0].set_title(prod)
+                GraphingActor.subplots[i, 0].set_title('{} - {}'.format(exchange_name, prod))
                 plot_bid = GraphingActor.subplots[i, 0].plot(bid_tbl['price'], bid_tbl['volume_cumul'], color='green',
                                                              linestyle='solid')[0]
                 plot_ask = GraphingActor.subplots[i, 0].plot(ask_tbl['price'], ask_tbl['volume_cumul'], color='red',
@@ -74,21 +71,3 @@ class GraphingActor(ThreadingActor):
 
             plt.draw()
             plt.pause(0.1)
-
-    @staticmethod
-    def get_product_book(book, product_id):
-        result = {
-            'sequence': book[product_id]['sequence'],
-            'asks': [[order['side'], order['price'], order['size'], order['id']] for ask in book[product_id]['_asks']
-                     for order in book[product_id]['_asks'][ask]],
-            'bids': [[order['side'], order['price'], order['size'], order['id']] for bid in book[product_id]['_bids']
-                     for order in book[product_id]['_bids'][bid]],
-        }
-        return result
-
-    @staticmethod
-    def get_full_book(book):
-        res = {}
-        for prod in book:
-            res.update({prod: GraphingActor.get_product_book(book, prod)})
-        return res

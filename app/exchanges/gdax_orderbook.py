@@ -21,6 +21,7 @@ class GDaxOrderBook(WebsocketClient, OrderBook):
         WebsocketClient.__init__(self, *args, **kwargs)
         OrderBook.__init__(self, actors=actors, *args, **kwargs)
         self._client = client
+        self.exchange_name = 'Gdax'
 
     def on_open(self):
         self._first_run = True
