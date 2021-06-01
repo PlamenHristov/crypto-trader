@@ -28,7 +28,7 @@ requests==2.18.4
 signalr-client==0.0.7
 six==1.11.0
 sseclient==0.0.18
-urllib3==1.22
+urllib3==1.26.5
 websocket-client==0.47.0
 wsaccel==0.6.2
 zmq==0.0.0
